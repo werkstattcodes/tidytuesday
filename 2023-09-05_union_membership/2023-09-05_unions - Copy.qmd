@@ -1,0 +1,557 @@
+---
+title: "Untitled"
+format: html
+  knitr:
+    opts_chunk: 
+      dev: "ragg_png"
+---
+
+# Get Packages
+```{r}
+library(tidyverse)
+library(tidytuesdayR)
+library(skimr)
+library(geofacet)
+library(extrafont)
+library(patchwork)
+library(ggtext)
+# font_import()
+library(showtext)
+library(systemfonts)
+library(ggh4x)
+```
+
+```{r}
+knitr::opts_chunk$set(dev = "ragg_png")
+```
+
+# Add fonts
+```{r}
+font_add_google("Source Sans Pro", "SSP")
+font_add_google("Roboto Condensed", "RobotoC")
+font_add_google("Lora", "Lora")
+font_add_google("Oswald", "Oswald")
+showtext::showtext_auto()
+```
+
+# Graph properties
+# |- figure size ---- 
+
+```{r}
+library(camcorder)
+camcorder::gg_record( 
+    dir    = here::here("temp_plots"), 
+    device = "png",
+    width  = 10,
+    height = 10,
+    units  = "in",
+    dpi    = 300) 
+
+```
+
+
+```{r}
+showtext_opts(dpi = 300, regular.wt = 300, bold.wt = 800)
+showtext::showtext_auto()
+```
+
+# Get data
+```{r}
+# https://github.com/rfordatascience/tidytuesday/blob/master/data/2023/2023-09-05/readme.md
+
+demographics <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-09-05/demographics.csv")
+wages <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-09-05/wages.csv")
+states <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-09-05/states.csv")
+
+skim(demographics)
+unique(states$sector)
+unique(demographics$facet)
+
+
+```
+
+# Define colors 
+```{r}
+# col_bg <- "#262a33"
+# col_bg <- "#0e171f"
+col_bg <- "white"
+# col_txt <- "white"
+col_txt <- "black"
+col_txt_2 <- "grey"
+# col_members <- "#f5b841"
+col_members <- "#d00000"
+col_members_not <- "lightgrey"
+```
+
+# Create Map 
+```{r}
+df_states <- states %>%
+  filter(str_detect(sector, regex("Total")))
+```
+
+## annotations  
+```{r}
+df_annotation_map_start <- df_states %>%
+  group_by(state) %>%
+  slice_head(., n = 5) %>%
+  summarise(
+    year_min = min(year),
+    pos_max = max(p_members),
+    p_members_first = first(p_members)
+  )
+
+df_annotation_map_end <- df_states %>%
+  group_by(state) %>%
+  slice_tail(., n = 20) %>%
+  summarise(
+    year_max = max(year),
+    pos_max = max(p_members),
+    p_members_last = last(p_members)
+  )
+```
+
+
+
+## Plot map 
+```{r}
+pl_map <- df_states %>%
+  ggplot() +
+  labs(
+    title = "Percent of employed workers who are union members per year and state (1983-2022):",
+    subtitle="The decline of union membership rates was particularly strong in the North.However, membership rates were \nhistorically higher than those in the South."
+  ) +
+  geom_text(
+    aes(x=1983, y=Inf-.01, label=state_abbreviation),
+    vjust=1,
+    hjust=0,
+   family="SSP"
+  )+
+  geom_text(
+    data = df_annotation_map_start,
+    aes(
+      x = year_min - 0.5,
+      y = pos_max + .03,
+      #   color = p_members,
+      label = p_members_first %>% scales::percent(., accuracy = .1) # "lightgreen"
+      #   label = year # "lightgreen"
+    ),
+    family="SSP",
+    color=col_txt,
+    hjust = 0,
+    size = 2.5,
+  ) +
+  geom_text(
+    data = df_annotation_map_end,
+    aes(
+      x = year_max,
+      y = pos_max + .03,
+      #   color = p_members,
+      label = p_members_last %>% scales::percent(., accuracy = .1) # "lightgreen"
+      #   label = year # "lightgreen"
+    ),
+    family="SSP",
+    color=col_txt,
+    hjust = 1,
+    size = 2.5,
+  ) +
+  geom_line(
+    aes(
+      x = year,
+      y = p_members
+    ),
+    linewidth = .3,
+    color = col_members
+  ) +
+  scale_y_continuous(
+    labels = scales::label_percent(),
+    # limits = c(0, max(df_states$p_members)),
+    expand = expansion(mult = c(0, 0.5))
+  ) +
+  scale_x_continuous(
+    breaks = c(1983, 2023),
+    labels = function(x) str_sub(x, start = 3)
+  ) +
+  facet_geo(facets = "state", label="code") +
+  theme(
+    legend.position = "none",
+    axis.title = element_blank(),
+    axis.text.y = element_blank(),
+    axis.text.x = element_blank(),
+    # axis.text = element_text(
+    #   color = "#929299",
+    #   size = 6,
+    #   hjust = 0.5
+    # ),
+    plot.title = element_text(
+      family = "SSP",
+      size = 14,
+      face = "bold",
+      color = col_txt,
+    ),
+    plot.subtitle=element_text(
+       margin=ggplot2::margin(0, 0, .5, 0, "cm")
+    ),
+    plot.background = element_rect(fill = col_bg, color=col_bg),
+    plot.margin = ggplot2::margin(0, 0, 0, 0, "cm"),
+    panel.border=element_blank(),
+    # panel.border = element_rect(
+    #   color = col_txt,
+    #   linewidth = 0.1,
+    #   fill = NA
+    # ),
+    panel.background = element_rect(
+      # fill = col_bg, 
+      fill = "#fbfbfb", 
+      color=col_bg
+    ),
+    panel.grid = element_blank(),
+    strip.background = element_rect(fill = col_bg, color = NA),
+    # strip.text = element_text(color = col_txt),
+    strip.text=element_blank(),
+    axis.ticks = element_blank()
+  )
+
+# pl_map
+
+pl_map_grob <- get_geofacet_grob(pl_map)
+```
+ 
+```{r}
+wrap_pl_map_grob_themed <- wrap_elements(pl_map_grob)+
+theme(
+  plot.background=element_rect(fill=col_bg, color=col_bg),
+  plot.margin=margin(1, 0, .5, 0, "cm")
+    )
+```
+
+
+# Barplots
+
+## Data
+```{r}
+vec_sector <- unique(demographics$facet)[1:8]
+
+df_demo <- demographics %>%
+  filter(facet %in% vec_sector) %>%
+  mutate(members_not = employment - members) %>%
+  select(year, facet, members, members_not) %>%
+  pivot_longer(cols = c("members", "members_not"), names_to = "status", values_to = "n") %>%
+  mutate(facet=case_when(
+    str_detect(facet, regex("transport")) ~ "Transport, Comm., Utilities",
+    .default=facet
+  ))
+
+unique(df_demo$facet)  
+```
+
+
+Check: Sum is not equal to total! 
+```{r}
+#check:
+df_check <- df_demo %>%
+mutate(group_id=case_when(
+  str_detect(facet, regex("wage")) ~ "a",
+  .default="b"
+)) %>%
+group_by(year, group_id) %>%
+summarise(N=sum(n)) %>%
+pivot_wider(
+  id_cols=year,
+  names_from=group_id,
+  values_from=N
+) %>%
+mutate(diff=a-b)
+```
+
+## Barplot abs
+
+```{r}
+df_bar_abs <- df_demo %>%
+  mutate(status=factor(status, levels=c("members_not", "members"))) 
+
+pl_bar_abs <- df_bar_abs %>%
+ggplot()+
+  labs(
+    title = "Absolute number of union members per sector"
+  ) +
+geom_bar(
+aes(x=year,
+y=n,
+fill=status),
+stat="identity")+
+  scale_x_continuous(
+    breaks=c(1973, 1980, 1990, 2000, 2010, 2022),
+    labels=function(x) str_sub(x, start=3),
+    expand=expansion(add=c(5))
+  )+
+  scale_y_continuous(
+    # label=scales::label_percent(),
+    expand=expansion(mult=c(0, .1)))+
+  scale_fill_manual(values = c(
+    "members" = col_members,
+    "members_not" = col_members_not)) +
+  scale_color_identity()+
+  facet_wrap(
+    vars(facet), 
+    nrow = 1,
+    labeller=as_labeller(function(x) str_to_title(x) %>% str_wrap(., width=20)))+
+theme(
+    legend.position = "none",
+    axis.title = element_blank(),
+    axis.text.y = element_blank(),
+    axis.text = element_text(
+      color = "#929299",
+      size = 6,
+      hjust = 0.5
+    ),
+    plot.title = element_text(
+      family = "SSP",
+      size = 12,
+      face = "bold",
+      color = col_txt
+    ),
+    plot.background = element_rect(fill = col_bg),
+    plot.margin = ggplot2::margin(0, 2, 0, 2, "cm"),
+    # panel.border = element_rect(
+    #   color = "grey",
+    #   linewidth = 0.1,
+    #   fill = NA
+    # ),
+    panel.border=element_blank(),
+    panel.background = element_rect(
+      fill = col_bg
+    ),
+    panel.grid = element_blank(),
+    strip.background = element_rect(fill = col_bg, color = NA),
+    strip.text = element_text(
+      color = col_txt,
+      hjust=0,
+      vjust=1
+      ),
+    axis.ticks = element_blank())
+pl_bar_abs
+
+```
+
+## Barplot relat
+
+Calculate shares 
+```{r}
+df_bar_perc <- df_demo %>%
+  mutate(status=factor(status, levels=c("members_not", "members"))) %>%
+  group_by(facet, year) %>%
+  mutate(n_rel=n/sum(n)) %>%
+  filter(status=="members") %>%
+  mutate(facet_col=case_when(
+    str_detect(facet, regex("wages")) ~ "total",
+    .default="sector"
+  ))  %>%
+  ungroup()
+```
+
+### annotations 
+```{r}
+library(slider)
+df_annotation_start <- df_bar_perc %>%
+group_by(facet) %>%
+arrange(facet, year, .by_group = T) %>%
+mutate(lead_pos=slide_dbl(n_rel, max, .after=10)) %>%
+mutate(lead_mean=slide_dbl(n_rel, mean, .after=10)) %>%
+mutate(direction=ifelse(n_rel<lead_mean, "increase", "increase_not")) %>%
+mutate(color_text=case_when(
+  direction=="increase" ~ "white",
+  .default=col_members
+)) %>%
+mutate(label_pos=case_when(
+  direction=="increase" ~ n_rel-0.05,
+  direction=="increase_not" ~ lead_pos+.05
+))
+
+df_annotation_end <- df_bar_perc %>%
+mutate(lead_max=slide_dbl(n_rel, max, .before=15)) %>%
+mutate(label_pos=case_when(
+  str_detect(facet, regex("public|transp")) ~ n_rel-0.05,
+  .default=lead_max+.05
+))  %>%
+mutate(color_text=case_when(
+  label_pos<n_rel ~ "white",
+  label_pos>n_rel ~ col_members,
+  .default=col_members
+)) 
+```
+ 
+### Create plot 
+```{r}
+#create empty list; as many elements as facets
+strip_text <- vector(mode = "list", length = length(unique(df_bar_perc$facet)))
+strip_text[[1]] <- element_text(color="black", face="italic")
+
+pl_bar_perc <- df_bar_perc %>%
+  ggplot() +
+  labs(
+    title = "Share of union members per sector (1973-2022):",
+    subtitle="Only in the public sector did union membership rates not decline. No data for 1982 available."
+  ) +
+  geom_bar(
+    aes(
+      x = year,
+      y = n_rel,
+      # group=facet,
+      fill = status
+    ),
+    stat = "identity"
+    # position = "fill"
+  ) +
+  geom_text(
+data=df_annotation_start %>% filter(year==min(df_annotation_start$year)),
+aes(
+  x=year,
+  y=label_pos,
+  label=n_rel %>%scales::percent(., accuracy=1),
+  color=color_text
+),
+hjust=0,
+family="SSP"
+  )+
+  geom_text(
+data=df_annotation_end %>% filter(year==max(df_annotation_start$year)),
+aes(
+  x=year,
+  y=label_pos,
+  label=n_rel %>%scales::percent(., accuracy=1),
+  color=color_text
+),
+hjust=1,
+family="SSP"
+  )+
+  scale_x_continuous(
+    breaks=c(1973, 1980, 1990, 2000, 2010, 2022),
+    labels=function(x) str_sub(x, start=3) %>% paste0("'",.),
+    expand=expansion(mult=c(0, 0))
+  )+
+  scale_y_continuous(
+    label=scales::label_percent(),
+    expand=expansion(mult=c(0, .1)))+
+  scale_fill_manual(values = c(
+    "members" = col_members,
+    "members_not" = col_members_not)) +
+  scale_color_identity()+
+  facet_wrap2(
+    vars(facet), 
+    nrow = 2,
+    labeller=as_labeller(function(x) str_to_title(x) %>% str_wrap(., width=40)),
+    strip=strip_themed(
+      text_x=strip_text
+    ))+
+  theme(
+    legend.position = "none",
+    axis.title = element_blank(),
+    axis.text.y = element_blank(),
+    axis.text = element_text(
+      color = "#929299",
+      size = 6,
+      hjust = c(rep(0.5, 5), 1)
+    ),
+    plot.margin=margin(0.5, 2, .5, 2, "cm"),
+    plot.title = element_text(
+      family = "SSP",
+      size = 14,
+      face = "bold",
+      color = col_txt
+    ),
+    plot.subtitle = element_text(margin=margin(0, 0, 0.5, 0, "cm")),
+    plot.background = element_rect(fill = col_bg, color=col_bg),
+    # panel.border = element_rect(
+    #   color = "grey",
+    #   linewidth = 0.1,
+    #   fill = NA
+    # ),
+    panel.border=element_blank(),
+    panel.spacing.y = unit(0.5, units="cm"),
+    panel.background = element_rect(
+      fill = col_bg,
+      color=col_bg
+    ),
+    panel.grid = element_blank(),
+    strip.background = element_rect(fill = col_bg, color = NA),
+    strip.text = element_text(
+      color = col_txt,
+      margin=margin(l=0, unit="cm"),
+      hjust=0,
+      vjust=1
+      ),
+    axis.ticks = element_blank())
+
+pl_bar_perc
+```
+
+# Patchwork 
+```{r}
+library(sysfonts)
+
+path_fa_brands <- system_fonts() %>%
+filter(str_detect(name, "Brands") &
+str_detect(name, "6")) %>% pull(path)
+
+font_add('fa6-brands',  regular=path_fa_brands) 
+
+path_fa_regular <- system_fonts() %>%
+filter(str_detect(name, "Awesome") &
+str_detect(name, "Free-Regular")) %>% pull(path)
+
+font_add('fa6-regular',  regular=path_fa_regular) 
+
+path_fa_solid <- system_fonts() %>%
+filter(str_detect(name, "Awesome") &
+str_detect(name, "Free-Solid")) %>% pull(path)
+
+font_add('fa6-solid',  regular=path_fa_solid) 
+
+showtext::showtext_auto()
+
+
+gh <- str_glue("<span style='font-family:fa6-brands'>&#xf09b;</span>")
+
+# X <- str_glue("<span style='font-family:Font Awesome 6 Brands'>&#xe61b;</span>")   
+# mn <- str_glue("<span style='font-family:Font Awesome 6 Brands'>&#xf4f6;</span>")
+
+icon_data <- "&#xf0c7;"
+icon_mastadon <- "&#xf4f6;"
+icon_website <- "&#xf0c1;"
+icon_x <- "&#xe61b;"
+
+txt_caption <- glue::glue("Roland Schmidt - <span style='font-family:fa6-solid'>{icon_website}</span> https:&#47;&#47;<span style='font-style:bold;'>werk.statt.codes</span> - <span style='font-family:fa6-brands;'>{icon_mastadon}</span> mastodon.social/@zoowalk - <span style='font-family:fa6-brands'>{icon_x}</span> @zoowalk")
+
+
+pl_comb <- wrap_pl_map_grob_themed / pl_bar_perc + 
+    plot_layout(heights = c(9, 4)) +
+    plot_annotation(
+        title = glue::glue("\n\nThe State of the declining <span style='color:{col_members}'>Union Membership Rates</span>"),
+        subtitle="Union membership rates have been declining for several decades in the US, across regions as well across sectors.",
+        caption= txt_caption,
+        theme=theme(
+          plot.title=element_markdown(
+            color="black", 
+            family="Oswald", 
+            face="bold",
+            margin=ggplot2::margin(1.5, 0, 0, .2, "cm"),
+            size=20),
+          plot.subtitle=element_markdown(
+            family="SSP",
+            size=12,
+            color="black",
+            face="plain",
+            margin=ggplot2::margin(0.25, 0, 0, 0.2, "cm")
+          )
+        )) &
+  theme(
+    plot.background=element_rect(fill=col_bg, color=col_bg),
+    panel.background=element_rect(color=col_bg),
+    plot.caption=element_markdown(color="grey30")
+  )
+
+pl_comb
+
+
+```
+ 
