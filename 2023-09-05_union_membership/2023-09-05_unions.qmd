@@ -123,7 +123,7 @@ pl_map <- df_states %>%
   ggplot() +
   labs(
     title = "Percent of employed workers who are union members per year and state (1983-2022):",
-    subtitle="The decline of union membership rates was particularly strong in the North.However, membership rates were \nhistorically higher than those in the South."
+    subtitle="The decline of union membership rates was particularly strong in the North. However, membership rates were \nhistorically higher than those in the South."
   ) +
   geom_text(
     aes(x=1983, y=Inf-.01, label=state_abbreviation),
@@ -228,6 +228,8 @@ df_demo <- demographics %>%
   pivot_longer(cols = c("members", "members_not"), names_to = "status", values_to = "n") %>%
   mutate(facet=case_when(
     str_detect(facet, regex("transport")) ~ "Transport, Comm., Utilities",
+    str_detect(facet, regex("finance")) ~
+    "Finance, Insurance & Real Estate",
     .default=facet
   ))
 
@@ -313,8 +315,8 @@ strip_text[[1]] <- element_text(color="black", face="italic")
 pl_bar_perc <- df_bar_perc %>%
   ggplot() +
   labs(
-    title = "Share of union members per sector (1973-2022):",
-    subtitle="Only in the public sector did union membership rates not decline. No data for 1982 available."
+    title = "Share of union members per year and sector (1973-2022):",
+    subtitle="Only in the public administration did union membership rates not decline. No data for 1982 available."
   ) +
   geom_bar(
     aes(
@@ -410,9 +412,10 @@ icon_mastadon <- "&#xf4f6;"
 icon_website <- "&#xf0c1;"
 icon_x <- "&#xe61b;"
 
+txt_tidy <- "A #tidytuesday submission."
 txt_source <- "Data: Barry T. Hirsch, David A. Macpherson, and William E. Even (www&#46;
 unionstats&#46;com)"
-txt_caption <- glue::glue("{txt_source}<br>Graph: Roland Schmidt - <span style='font-family:fa6-solid'>{icon_website}</span> https:&#47;&#47;<span style='font-style:bold;'>werk.statt.codes</span> - <span style='font-family:fa6-brands;'>{icon_mastadon}</span> mastodon.social/@zoowalk - <span style='font-family:fa6-brands'>{icon_x}</span> @zoowalk")
+txt_caption <- glue::glue("{txt_tidy}<br><br>{txt_source}<br>Graph: Roland Schmidt - <span style='font-family:fa6-solid'>{icon_website}</span> https:&#47;&#47;<span style='font-style:bold;'>werk.statt.codes</span> - <span style='font-family:fa6-brands;'>{icon_mastadon}</span> mastodon.social/@zoowalk - <span style='font-family:fa6-brands'>{icon_x}</span> @zoowalk")
 ```
 
 Combine plots 
@@ -421,18 +424,18 @@ pl_comb <- wrap_pl_map_grob_themed / pl_bar_perc +
     plot_layout(heights = c(9, 4)) +
     plot_annotation(
         title = glue::glue("\n\nThe State of the declining <span style='color:{col_members}'>Union Membership Rates</span>"),
-        subtitle="Union membership rates have been declining for several decades in the US, across regions as well across sectors.",
+        subtitle="Union membership rates have been declining for several decades in the US, across regions as well as <br>across sectors. Data provided on union.com details this development.",
         caption= txt_caption,
         theme=theme(
           plot.title=element_markdown(
             color="black", 
             family="Oswald", 
             face="bold",
-            margin=ggplot2::margin(1.5, 0, 0, .2, "cm"),
+            margin=ggplot2::margin(2, 0, 0, .2, "cm"),
             size=20),
           plot.subtitle=element_markdown(
             family="SSP",
-            size=12,
+            size=14,
             color="black",
             face="plain",
             margin=ggplot2::margin(0.25, 0, 0, 0.2, "cm")
@@ -441,7 +444,8 @@ pl_comb <- wrap_pl_map_grob_themed / pl_bar_perc +
   theme(
     plot.background=element_rect(fill=col_bg, color=col_bg),
     panel.background=element_rect(color=col_bg),
-    plot.caption=element_markdown(color="grey30")
+    plot.caption=element_markdown(color="grey30",
+    hjust=0)
   )
 
 pl_comb
