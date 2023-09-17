@@ -1,0 +1,324 @@
+---
+title: "The global human day - child care"
+format: html
+---
+
+
+https://github.com/rfordatascience/tidytuesday/blob/master/data/2023/2023-09-12/readme.md
+
+https://www.pnas.org/doi/10.1073/pnas.2219564120#sec-1
+
+# Packages
+```{r}
+library(tidyverse)
+library(camcorder)
+library(showtext)
+library(ggtext)
+library(systemfonts)
+library(sysfonts)
+library(ggbeeswarm)
+
+```
+
+# Colors
+
+```{r}
+col_bg <- "#24292e"
+# col_bg <- "white"
+# col_dots <- 
+col_border <- "lightgrey"
+col_border <- "transparent"
+
+col_title <- "#D1D0CE"
+col_subtitle <- "#D1D0CE"
+col_caption <- "darkgrey"
+col_axis <- "#D1D0CE"
+
+col_region <- c(
+  "prussian-blue" = "#9bc1bc",
+  "fire-engine-red" = "#d62828",
+  "orange-wheel" = "#f77f00",
+  "xanthous" = "#fcbf49",
+  "vanilla" = "#eae2b7"
+) %>% unname()
+
+
+vec_region_code_2_long=c(
+    "EU"="Europe", 
+    "AS"="Asia",
+    "AN"="Australia & Newzealand",
+    "AM"="Amercia",
+    "AF"="Africa")
+
+labeller_region_2 <- labeller(vec_region_code_2_long)
+
+```
+
+# graph size
+
+```{r}
+library(camcorder)
+camcorder::gg_record( 
+    dir    = here::here("2023-09-12_human_day","plots"), 
+    device = "png",
+    width  = 10,
+    height = 8,
+    units  = "in",
+    dpi    = 300) 
+
+showtext_opts(dpi = 300, regular.wt = 300, bold.wt = 800)
+```
+
+# fonts
+```{r}
+path_fa_brands <- system_fonts() %>%
+filter(str_detect(name, "Brands") &
+str_detect(name, "6")) %>% pull(path)
+
+font_add('fa6-brands',  regular=path_fa_brands) 
+
+path_fa_regular <- system_fonts() %>%
+filter(str_detect(name, "Awesome") &
+str_detect(name, "Free-Regular")) %>% pull(path)
+
+font_add('fa6-regular',  regular=path_fa_regular) 
+
+path_fa_solid <- system_fonts() %>%
+filter(str_detect(name, "Awesome") &
+str_detect(name, "Free-Solid")) %>% pull(path)
+
+font_add('fa6-solid',  regular=path_fa_solid) 
+
+
+font_add_google("Handlee", "font_main")
+showtext::showtext_auto()
+
+```
+
+# Get Data
+```{r}
+library(tidytuesdayR)
+library(tidyverse)
+tuesdata <- tidytuesdayR::tt_load('2023-09-12')
+class(tuesdata)
+
+all_countries <- tuesdata$all_countries
+country_regions <- tuesdata$country_regions
+global_human_day <- tuesdata$global_human_day
+global_economic_activity <- tuesdata$global_economic_activity
+```
+
+# Select subcategory "child" 
+```{r}
+all_countries %>%
+distinct(Category, Subcategory)
+
+df_child <- all_countries %>%
+filter(str_detect(Subcategory, "child"))  %>%
+mutate(region_code_2=str_sub(region_code, end=2))
+
+df_child$region_code_2_long <- vec_region_code_2_long[match(df_child$region_code_2, names(vec_region_code_2_long))]
+
+df_child <- df_child %>%
+mutate(region_code_2=fct_relevel(region_code_2, "EU", "AM", "AS", "AN", "AF"))
+```
+ 
+
+# Text
+```{r}
+txt_title="THE GLOBAL HUMAN DAY: CHILD CARE"
+
+txt_subtitle="The Human Chronome Project estimates how humans spend their time using a generalized, physical outcome–based categorization. The category 'physical child care' covers paid daycare work and unpaid care of young children by parents. Each dot represents one country."
+
+
+icon_data <- "&#xf0c7;"
+icon_mastadon <- "&#xf4f6;"
+icon_website <- "&#xf0c1;"
+icon_x <- "&#xe61b;"
+
+txt_tidy <- "A #tidytuesday submission."
+txt_source <- "Data: The Global Human Day (2023), PNAS 120 (25). Note that uncertainty term for estimates is not reflected in the visualisation."
+
+txt_caption <- glue::glue("{txt_tidy}<br><br>{txt_source}<br>Graph: Roland Schmidt - <span style='font-family:fa6-solid'>{icon_website}</span> https:&#47;&#47;<span style='font-style:bold;'>werk.statt.codes</span> - <span style='font-family:fa6-brands;'>{icon_mastadon}</span> mastodon.social/@zoowalk - <span style='font-family:fa6-brands'>{icon_x}</span> @zoowalk")
+```
+
+# inset maps
+
+```{r}
+# Load map data
+library(sf)
+library(rnaturalearth)
+
+irl <- ne_countries(country="Ireland", scale = "large", returnclass = "sf")
+```
+
+## IRL
+```{r}
+plot_irl <- ggplot(data = irl)+
+labs(title="Ireland")+
+    geom_sf(fill="#eae2b7")+
+    scale_y_continuous(expand=expansion(mult=0))+
+    theme(panel.background=element_rect(fill="transparent", color="transparent"),
+    plot.margin=ggplot2::margin(0,0,0,0, "cm"), 
+    plot.background=element_rect(fill="transparent", color="transparent"),
+    axis.ticks=element_blank(),
+    axis.text=element_blank(),
+    panel.grid=element_blank(),
+    panel.border=element_blank(),
+    plot.title=element_text(
+        color="#eae2b7",
+        hjust=1,
+        size=12
+    )
+    )
+plot_irl
+```
+
+## Central America
+```{r}
+df_ca <- df_child %>%
+filter(hoursPerDayCombined>0.6 & region_code_2!="EU") 
+
+library(countrycode)
+df_ca$country_name   <- countrycode(df_ca$country_iso3, origin = "iso3c", destination = "iso2c")
+
+vec_ca <- df_ca %>%
+distinct(country_name) %>%pull()
+nrow(vec_ca)
+
+
+ca <- ne_states(iso_a2=vec_ca, returnclass="sf")
+
+plot_ca <- ggplot(data=ca)+
+labs(title="Central America")+
+geom_sf(fill="#fcbf49")+
+    scale_y_continuous(expand=expansion(mult=0))+
+    theme(panel.background=element_rect(fill="transparent", color="transparent"),
+    plot.margin=ggplot2::margin(0,0,0,0, "cm"), 
+    plot.background=element_rect(fill="transparent", color="transparent"),
+    axis.text=element_blank(),
+    panel.grid=element_blank(),
+    panel.border=element_blank(),
+    plot.title=element_text(
+        color="#fcbf49",
+        size=12
+    ),
+    axis.ticks=element_blank()
+    )
+plot_ca
+```
+
+# Beeswarm plot
+```{r}
+#labelling function
+
+label_fun <- function(x) {
+  purrr::map_chr(x, ~ if (.x == max(x)) {
+    paste(.x * 60, "min per Day")
+  } else {
+    paste(.x * 60, "min")
+  })
+}
+
+
+pl_bee <- df_child %>%
+ggplot()+
+labs(
+    title=txt_title,
+    subtitle=str_wrap(txt_subtitle, 100),
+    caption=txt_caption
+)+
+ggbeeswarm::geom_quasirandom(aes(
+    x=hoursPerDayCombined,
+    y=as.factor(1),
+    color=region_code_2),
+    cex=1,
+    size=2#,
+# groupOnX = FALSE
+)+
+scale_x_continuous(
+    labels=label_fun,
+    breaks=c(min(df_child$hoursPerDayCombined), .25, .50, max(df_child$hoursPerDayCombined)),
+    limits=c(0.1,1),
+    expand=expansion(mult=c(0,.1))
+)+
+scale_y_discrete(
+    expand=expansion(mult=c(.45,.45))
+)+
+scale_color_manual(values=col_region %>% rev(),
+labels=c("EU"="Europe", "AM"="America", "AS"="Asia", "AF"="Africa", "AN"="Australia & New Zealand"))+
+theme(
+    plot.background=element_rect(fill=col_bg),
+    plot.title=element_text(
+        size=20,
+        face="bold",
+        color=col_title,
+        family="font_main"
+    ),
+    plot.subtitle=element_text(
+        size=14,
+        color=col_subtitle,
+        family="font_main"
+    ),
+    panel.background=element_rect(fill=col_bg,
+    color=col_border),
+    panel.grid=element_blank(),
+    axis.text.x=element_text(
+        color=col_axis,
+        family="font_main",
+        size=12,
+        hjust=.5
+    ),
+    axis.title.x=element_blank(),
+    axis.text.y=element_blank(),
+    axis.title.y=element_blank(),
+    axis.ticks.x=element_line(color=col_axis),
+    legend.position=c(-0.02, 1),
+    legend.justification="left",
+    legend.direction="horizontal",
+    legend.background=element_rect(fill="transparent"),
+    legend.text=element_text(color="#D1D0CE",
+    family="font_main", size=12, hjust=1),
+    legend.margin=ggplot2::margin(0.5,0,0,0, "cm"),
+    legend.key=element_rect(fill="transparent"),
+    legend.title=element_blank(),
+    strip.text=element_text(
+        color="transparent",
+        size=0
+    ),
+    strip.background=element_rect(
+        fill=col_bg,
+        color=col_border        
+    ),
+    panel.spacing.y=unit(0, "cm"),
+    plot.margin=ggplot2::margin(2, 2, 1, 2, unit="cm"),
+    plot.caption=element_markdown(color=col_caption,
+    # fill="red",
+    margin=ggplot2::margin(0.5,0,0,0, "cm"),
+    hjust=0)
+    )
+pl_bee
+```
+
+## add maps
+```{r}
+pl_bee +
+annotation_custom(ggplotGrob(plot_irl),
+xmin=.75, xmax=1,
+ymin=.65, ymax=.9)+
+annotation_custom(ggplotGrob(plot_ca),
+xmin=.75, xmax=1.2,
+ymin=1, ymax=1.4)+
+geom_rect(aes(xmin=0.68, xmax=0.75, ymin=.7, ymax=1.3), fill="transparent", color="darkgrey",
+linewidth=.5,
+linetype="dotted")+
+geom_path(data=data.frame(x=c(0.75, .9), y=c(1.1, 1.2)), aes(x,y),
+linewidth=.5,
+color="darkgrey",
+linetype="dotted")+
+geom_path(data=data.frame(x=c(0.77, .9), y=c(1.01, .8)), aes(x, y),
+linewidth=.5,
+color="darkgrey",
+linetype="dotted")
+
+```
